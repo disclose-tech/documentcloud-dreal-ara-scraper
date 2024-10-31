@@ -269,5 +269,5 @@ class ARASpider(scrapy.Spider):
                         zip_seen_supported_files=zip_seen_supported_files,
                         file_from_zip=True,
                         year=str(self.target_year),
-                        departments=doc_item["departments"],
+                        # departments=doc_item["departments"],
                     )
