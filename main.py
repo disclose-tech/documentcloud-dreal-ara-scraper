@@ -75,6 +75,7 @@ class DiscloseDREALARAScraper(AddOn):
 
         # Add-on inputs
 
+        self.run_name = self.data["run_name"]
         self.access_level = self.data["access_level"]
         self.check_access_level()
 
