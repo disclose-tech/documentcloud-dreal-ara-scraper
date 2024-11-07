@@ -123,6 +123,7 @@ class DiscloseDREALARAScraper(AddOn):
             send_mail=self.send_mail,
             load_event_data=self.load_event_data,
             store_event_data=self.store_event_data,
+            upload_file=self.upload_file,
         )
 
         # Run
