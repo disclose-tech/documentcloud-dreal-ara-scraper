@@ -88,6 +88,8 @@ class DiscloseDREALARAScraper(AddOn):
             "time_limit", 345
         )  # Default to 5h45 as Github actions have a 6 hour limit
 
+        self.upload_event_data = self.data.get("upload_event_data")
+
         self.dry_run = self.data.get("dry_run", True)
 
         if not self.dry_run:
@@ -124,6 +126,7 @@ class DiscloseDREALARAScraper(AddOn):
             load_event_data=self.load_event_data,
             store_event_data=self.store_event_data,
             upload_file=self.upload_file,
+            upload_event_data=self.upload_event_data,
         )
 
         # Run
