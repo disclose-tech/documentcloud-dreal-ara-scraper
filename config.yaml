@@ -24,6 +24,7 @@ properties:
   upload_limit:
     title: Maximum number of documents to upload (per run)
     description: 0 for not limit
+    type: integer
     default: 0
   time_limit:
     title: Maximum number of minutes the scraper should run
