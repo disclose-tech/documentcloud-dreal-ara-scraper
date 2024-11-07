@@ -3,6 +3,7 @@ import os
 from urllib.parse import urlsplit
 from zipfile import ZipFile
 from pathlib import Path
+from datetime import datetime, timedelta
 
 import scrapy
 from scrapy.exceptions import CloseSpider
@@ -24,6 +25,22 @@ class ARASpider(scrapy.Spider):
     ]
 
     upload_limit_attained = False
+
+    start_time = datetime.now()
+
+    def check_time_limit(self):
+        """Closes the spider automatically if it reaches a duration of 5h45min"""
+        """as GitHub's actions have a 6 hours limit."""
+
+        if self.time_limit != 0:
+
+            limit = self.time_limit * 60
+            now = datetime.now()
+
+            if timedelta.total_seconds(now - self.start_time) > limit:
+                raise CloseSpider(
+                    f"Closed due to time limit ({self.time_limit} minutes)"
+                )
 
     def check_upload_limit(self):
         """Closes the spider if the upload limit is attained."""
@@ -51,7 +68,8 @@ class ARASpider(scrapy.Spider):
     def parse_years_list(self, response, department):
         """Parse the year selection page for a department."""
 
-        # self.logger.info(f"Scraping {department}")
+        self.check_time_limit()
+        self.check_upload_limit()
 
         if self.target_year > 2016:
 
@@ -99,6 +117,9 @@ class ARASpider(scrapy.Spider):
     def parse_projects_list(self, response, department, page, subdiv=""):
         """Parse projects list for a year & department."""
 
+        self.check_time_limit()
+        self.check_upload_limit()
+
         self.logger.info(
             f"Scraping {department}{' ' + subdiv if subdiv else ''}, page {page}"
         )
@@ -133,6 +154,9 @@ class ARASpider(scrapy.Spider):
 
     def parse_project_page(self, response, department, subdiv):
         """Parse the page of a project."""
+
+        self.check_time_limit()
+        self.check_upload_limit()
 
         project = response.css("h1.titre-article::text").get()
 
@@ -173,6 +197,7 @@ class ARASpider(scrapy.Spider):
 
     def parse_document_headers(self, response, department, subdiv, doc_item):
 
+        self.check_time_limit()
         self.check_upload_limit()
 
         doc_item["source_file_url"] = response.request.url
@@ -197,6 +222,9 @@ class ARASpider(scrapy.Spider):
                 yield doc_item
 
     def parse_zip_file(self, response, doc_item, department):
+
+        self.check_time_limit()
+        self.check_upload_limit()
 
         # Get the modification date of the zip in the headers
         publication_lastmodified = response.headers.get("Last-Modified").decode("utf-8")
