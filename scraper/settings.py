@@ -1,3 +1,6 @@
+from .log import PoliteLogFormatter
+
+LOG_FORMATTER = PoliteLogFormatter
 # Scrapy settings for scraper project
 #
 # For simplicity, this file contains only settings considered important or
