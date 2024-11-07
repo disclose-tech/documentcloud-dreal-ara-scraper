@@ -205,7 +205,7 @@ class UploadPipeline:
             "category": item["category"],
             "category_local": item["category_local"],
             "event_data_key": item["event_data_key"],
-            "source_scraper": "SIDE Scraper",
+            "source_scraper": f"DREAL ARA Scraper {spider.target_year}",
             "source_file_url": item["source_file_url"],
             "source_filename": item["source_filename"],
             "source_page_url": item["source_page_url"],

@@ -182,8 +182,7 @@ class ARASpider(scrapy.Spider):
                     year=str(self.target_year),
                     authority="Préfecture de région Auvergne-Rhône-Alpes",
                     category_local="Les décisions au cas par cas - Projets",
-                    source_scraper="DREAL ARA Scraper",
-                    # departments=re.search(r"\((\d\d)\)", department).group(1),
+                    source_scraper=f"DREAL ARA Scraper {self.target_year}",
                 )
 
                 yield response.follow(
@@ -288,7 +287,7 @@ class ARASpider(scrapy.Spider):
                         project=doc_item["project"],
                         category_local=doc_item["category_local"],
                         authority=doc_item["authority"],
-                        source_scraper="DREAL ARA Scraper",
+                        source_scraper=f"DREAL ARA Scraper {self.target_year}",
                         source_file_url=response.request.url,
                         source_filename=f.name,
                         source_page_url=doc_item["source_page_url"],
