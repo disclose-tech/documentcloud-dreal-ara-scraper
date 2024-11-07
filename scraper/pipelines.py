@@ -272,12 +272,13 @@ class UploadPipeline:
                 timestamp = now.strftime("%Y%m%d_%H%M")
                 filename = f"event_data_DREAL_ARA_{timestamp}.json"
 
-                with open(filename, "w") as event_data_file:
-                    json.dump(spider.event_data, event_data_file)
-                    spider.upload_file(event_data_file)
-                spider.logger.info(
-                    f"Uploaded event data to the Documentcloud interface."
-                )
+                if spider.upload_event_data:
+                    with open(filename, "w") as event_data_file:
+                        json.dump(spider.event_data, event_data_file)
+                        spider.upload_file(event_data_file)
+                    spider.logger.info(
+                        f"Uploaded event data to the Documentcloud interface."
+                    )
 
             else:
                 spider.logger.info("No event data to upload.")
