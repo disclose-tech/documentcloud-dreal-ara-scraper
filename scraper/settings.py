@@ -10,7 +10,7 @@ LOG_FORMATTER = PoliteLogFormatter
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
-BOT_NAME = "DREAL PACA Scraper"
+BOT_NAME = "DREAL ARA Scraper"
 
 SPIDER_MODULES = ["scraper.spiders"]
 NEWSPIDER_MODULE = "scraper.spiders"

@@ -18,7 +18,7 @@ class ARASpider(scrapy.Spider):
 
     name = "DREAL ARA Scraper"
 
-    # allowed_domains = ["paca.developpement-durable.gouv.fr"]
+    # allowed_domains = ["auvergne-rhone-alpes.developpement-durable.gouv.fr"]
 
     start_urls = [
         "https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/projets-r3463.html?lang=fr"
@@ -89,7 +89,6 @@ class ARASpider(scrapy.Spider):
                         links = section.css(".fr-collapse a")
 
                         for l in links:
-
                             link_url = l.attrib["href"]
                             link_text = l.css("::text").get().strip()
 
@@ -271,7 +270,7 @@ class ARASpider(scrapy.Spider):
 
                     zip_seen_supported_files.append(relative_filepath)
 
-        # Yield an object for each one
+        # Yield a document object for each one
         for f in extracted_files_list:
             if f.is_file():
                 filepath = str(f)
@@ -296,5 +295,4 @@ class ARASpider(scrapy.Spider):
                         zip_seen_supported_files=zip_seen_supported_files,
                         file_from_zip=True,
                         year=str(self.target_year),
-                        # departments=doc_item["departments"],
                     )

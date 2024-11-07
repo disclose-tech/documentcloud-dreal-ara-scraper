@@ -27,11 +27,8 @@ class ParseDatePipeline:
             item["publication_lastmodified"], "%a, %d %b %Y %H:%M:%S GMT"
         )
 
-        # item["publication_timestamp"] = publication_dt.isoformat() + "Z"
-
         item["publication_date"] = publication_dt.strftime("%Y-%m-%d")
         item["publication_time"] = publication_dt.strftime("%H:%M:%S UTC")
-
         item["publication_datetime"] = (
             item["publication_date"] + " " + item["publication_time"]
         )
@@ -50,7 +47,7 @@ class CategoryPipeline:
 
 
 class SourceFilenamePipeline:
-    """Adds the source_filename field based on source_file_url, or local_file_path for zip."""
+    """Adds the source_filename field based on source_file_url."""
 
     def process_item(self, item, spider):
 
@@ -113,7 +110,7 @@ class UnsupportedFiletypePipeline:
 
         if file_extension not in SUPPORTED_EXTENSIONS:
 
-            # If the file comes from a zip, remove it
+            # If the file comes from a zip, delete it locally
             if item["file_from_zip"]:
                 if os.path.isfile(item["local_file_path"]):
                     # print(f"Deleting {item['local_file_path']}...")
@@ -133,7 +130,7 @@ class UploadLimitPipeline:
     def process_item(self, item, spider):
         self.number_of_docs += 1
 
-        if spider.upload_limit == 0 or self.number_of_docs < spider.upload_limit + 1:
+        if spider.upload_limit == 0 or self.number_of_docs <= spider.upload_limit:
             return item
         else:
             spider.upload_limit_attained = True
@@ -286,11 +283,14 @@ class UploadPipeline:
                 spider.logger.info("No event data to upload.")
 
         if not spider.run_id:
-            with open("event_data.json", "w") as file:
-                json.dump(spider.event_data, file)
-                spider.logger.info(
-                    f"Saved file event_data.json ({len(spider.event_data['documents'])} documents, {len(spider.event_data['zips'])} zip files)"
-                )
+            if spider.event_data:
+                with open("event_data.json", "w") as event_data_file:
+                    json.dump(spider.event_data, event_data_file)
+                    spider.logger.info(
+                        f"Saved file event_data.json ({len(spider.event_data['documents'])} documents, {len(spider.event_data['zips'])} zip files)"
+                    )
+            else:
+                spider.logger.info("No event data to write.")
 
 
 class MailPipeline:
@@ -324,15 +324,15 @@ class MailPipeline:
 
             return item_string
 
-        subject = f"DREAL ARA Scraper {str(spider.target_year)} (New: {len(self.scraped_items)}) {spider.run_name}"
+        subject = f"DREAL ARA Scraper {str(spider.target_year)} (New: {len(self.scraped_items)}) [{spider.run_name}]"
 
-        ok_content = f"SCRAPED ITEMS ({len(self.scraped_items)})\n\n" + "\n\n".join(
+        content = f"SCRAPED ITEMS ({len(self.scraped_items)})\n\n" + "\n\n".join(
             [print_item(item) for item in self.scraped_items]
         )
 
         start_content = f"DREAL ARA Scraper Addon Run {spider.run_id}"
 
-        content = "\n\n".join([start_content, ok_content])
+        content = "\n\n".join([start_content, content])
 
         if not spider.dry_run:
             spider.send_mail(subject, content)
@@ -344,13 +344,10 @@ class DeleteZipFilesPipeline:
     def process_item(self, item, spider):
         if item["file_from_zip"]:
             if os.path.isfile(item["local_file_path"]):
-                # print(f"Deleting {item['local_file_path']}...")
                 os.remove(item["local_file_path"])
-
         return item
 
     def close_spider(self, spider):
-
         # Delete the downloaded_zips folder
         if os.path.isdir("downloaded_zips"):
             shutil.rmtree("downloaded_zips")

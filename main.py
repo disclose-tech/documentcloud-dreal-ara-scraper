@@ -75,8 +75,8 @@ class DiscloseDREALARAScraper(AddOn):
 
         # Add-on inputs
 
-        self.run_name = self.data["run_name"]
-        self.access_level = self.data["access_level"]
+        self.run_name = self.data.get("run_name", "no name")
+        self.access_level = self.data.get("access_level", "private")
         self.check_access_level()
 
         self.target_year = self.data.get(
@@ -88,18 +88,17 @@ class DiscloseDREALARAScraper(AddOn):
             "time_limit", 345
         )  # Default to 5h45 as Github actions have a 6 hour limit
 
-        self.dry_run = self.data.get("dry_run")
+        self.dry_run = self.data.get("dry_run", True)
 
         if not self.dry_run:
             try:
-                self.project = self.get_project_id()  # commented for development
+                self.project = self.get_project_id()
             except Exception as e:
                 raise Exception("Project error").with_traceback(e.__traceback__)
                 sys.exit(1)
-                # TODO : check user has access to the project
 
             # Check if the user has upload permissions (verified account)
-            self.check_permissions()  # commented for development
+            self.check_permissions()
         else:
             self.project = ""
 
@@ -128,7 +127,9 @@ class DiscloseDREALARAScraper(AddOn):
 
         # Run
 
-        self.set_message(f"Scraping DREAL ARA documents ({str(self.target_year)})")
+        self.set_message(
+            f"Scraping DREAL ARA documents {str(self.target_year)} [{self.run_name}]"
+        )
         process.start()
         self.set_message("Scraping complete!")
 
