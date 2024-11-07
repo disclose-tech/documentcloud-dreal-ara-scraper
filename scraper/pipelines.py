@@ -273,7 +273,7 @@ class UploadPipeline:
                 filename = f"event_data_DREAL_ARA_{timestamp}.json"
 
                 if spider.upload_event_data:
-                    with open(filename, "w") as event_data_file:
+                    with open(filename, "w+") as event_data_file:
                         json.dump(spider.event_data, event_data_file)
                         spider.upload_file(event_data_file)
                     spider.logger.info(
