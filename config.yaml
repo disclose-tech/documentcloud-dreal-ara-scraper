@@ -45,6 +45,7 @@ required:
 categories: 
   - monitor
 eventOptions:
+  name: run_name
   events:
     - hourly
     - daily
