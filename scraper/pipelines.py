@@ -228,12 +228,18 @@ class UploadPipeline:
                     access=spider.access_level,
                     data=data,
                 )
+
         except Exception as e:
             raise Exception("Upload error").with_traceback(e.__traceback__)
+
         else:  # No upload error, add to event_data
-            now = datetime.datetime.now().isoformat()
+            last_modified = datetime.datetime.strptime(
+                item["publication_lastmodified"], "%a, %d %b %Y %H:%M:%S %Z"
+            ).isoformat()
+            now = datetime.datetime.now().isoformat(timespec="seconds")
+
             spider.event_data["documents"][item["event_data_key"]] = {
-                "last_modified": item["publication_lastmodified"],
+                "last_modified": last_modified,
                 "last_seen": now,
                 "target_year": spider.target_year,
             }
@@ -249,7 +255,7 @@ class UploadPipeline:
                         zip_fully_processed = False
                 if zip_fully_processed:
                     spider.event_data["zips"][item["source_file_url"]] = {
-                        "last_modified": item["publication_lastmodified"],
+                        "last_modified": last_modified,
                         "last_seen": now,
                         "target_year": spider.target_year,
                     }
