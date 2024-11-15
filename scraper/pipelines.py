@@ -235,6 +235,7 @@ class UploadPipeline:
             spider.event_data["documents"][item["event_data_key"]] = {
                 "last_modified": item["publication_lastmodified"],
                 "last_seen": now,
+                "target_year": spider.target_year,
             }
             # Zip files
             if item["file_from_zip"]:
@@ -250,6 +251,7 @@ class UploadPipeline:
                     spider.event_data["zips"][item["source_file_url"]] = {
                         "last_modified": item["publication_lastmodified"],
                         "last_seen": now,
+                        "target_year": spider.target_year,
                     }
 
             # Store event_data (# only from the web interface)
