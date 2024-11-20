@@ -41,3 +41,7 @@ class DocumentItem(Item):
 
     event_data_key = Field()
     source_file_zip_path = Field()
+
+    departments = Field()
+    departments_sources = Field()
+    department_from_scraper = Field()

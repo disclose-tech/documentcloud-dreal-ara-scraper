@@ -9,11 +9,12 @@ import logging
 import json
 
 from itemadapter import ItemAdapter
-
 from scrapy.exceptions import DropItem
 from documentcloud.constants import SUPPORTED_EXTENSIONS
 
+
 from .log import SilentDropItem
+from .departments import department_from_authority, departments_from_project_name
 
 
 class ParseDatePipeline:
@@ -137,6 +138,33 @@ class UploadLimitPipeline:
             raise SilentDropItem("Upload limit exceeded.")
 
 
+class TagDepartmentsPipeline:
+
+    def process_item(self, item, spider):
+
+        item["departments"] = [item["department_from_scraper"]]
+        item["departments_sources"] = ["scraper"]
+
+        authority_department = department_from_authority(item["authority"])
+
+        if authority_department and authority_department != department_from_scraper:
+            item["departments_sources"].append("authority")
+            item["departments"].append(authority_department)
+
+        else:
+
+            project_departments = departments_from_project_name(item["project"])
+
+            if project_departments and project_departments != item["departments"]:
+                item["departments_sources"].append("regex")
+                item["departments"].extend(project_departments)
+
+        if item["departments"]:
+            item["departments"] = sorted(list(set(item["departments"])))
+
+        return item
+
+
 class UploadPipeline:
     """Upload document to DocumentCloud & store event data."""
 
@@ -215,6 +243,12 @@ class UploadPipeline:
         }
         if item["file_from_zip"]:
             data["source_file_zip_path"] = item["source_file_zip_path"]
+
+        adapter = ItemAdapter(item)
+        if adapter.get("departments") and adapter.get("departments_sources"):
+            data["departments"] = item["departments"]
+            data["departments_sources"] = item["departments_sources"]
+
         try:
             if not spider.dry_run:
                 spider.client.documents.upload(

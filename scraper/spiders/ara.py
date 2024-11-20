@@ -182,6 +182,9 @@ class ARASpider(scrapy.Spider):
                     authority="Préfecture de région Auvergne-Rhône-Alpes",
                     category_local="Les décisions au cas par cas - Projets",
                     source_scraper=f"DREAL ARA Scraper {self.target_year}",
+                    department_from_scraper=re.search(r"\((\d\d)\)", department).group(
+                        1
+                    ),
                 )
 
                 yield response.follow(
@@ -295,4 +298,5 @@ class ARASpider(scrapy.Spider):
                         zip_seen_supported_files=zip_seen_supported_files,
                         file_from_zip=True,
                         year=str(self.target_year),
+                        department_from_scraper=doc_item["department_from_scraper"],
                     )
