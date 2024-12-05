@@ -75,6 +75,7 @@ ITEM_PIPELINES = {
     "scraper.pipelines.UnsupportedFiletypePipeline": 500,
     "scraper.pipelines.TagDepartmentsPipeline": 550,
     "scraper.pipelines.UploadLimitPipeline": 600,
+    "scraper.pipelines.ProjectIDPipeline": 650,
     "scraper.pipelines.UploadPipeline": 700,
     "scraper.pipelines.MailPipeline": 800,
     "scraper.pipelines.DeleteZipFilesPipeline": 999,
