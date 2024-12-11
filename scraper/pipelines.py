@@ -35,6 +35,10 @@ class ParseDatePipeline:
             item["publication_date"] + " " + item["publication_time"]
         )
 
+        item["publication_datetime_dcformat"] = (
+            publication_dt.isoformat(timespec="microseconds") + "Z"
+        )
+
         return item
 
 
@@ -275,6 +279,7 @@ class UploadPipeline:
                     project=spider.target_project,
                     title=item["title"],
                     description=item["project"],
+                    publish_at=item["publication_datetime_dcformat"],
                     source="www.auvergne-rhone-alpes.developpement-durable.gouv.fr",
                     language="fra",
                     access=spider.access_level,
