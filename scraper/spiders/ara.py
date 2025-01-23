@@ -71,47 +71,43 @@ class ARASpider(scrapy.Spider):
         self.check_time_limit()
         self.check_upload_limit()
 
-        if self.target_year > 2016:
+        year_sections = response.css("#contenu .liste-rubriques > div")
 
-            year_sections = response.css("#contenu .liste-rubriques > div")
+        for section in year_sections:
 
-            for section in year_sections:
+            if section.css(".rubrique_avec_sous-rubriques"):
+                section_title = section.css("p.fr-tile__title::text").get().strip()
+            elif section.css(".item-liste-rubriques-seule"):
+                section_title = section.css(".fr-tile__link::text").get().strip()
+
+            # if section_title in self.target_years:
+            if any([str(x) in section_title for x in self.target_years]):
 
                 if section.css(".rubrique_avec_sous-rubriques"):
-                    section_title = section.css("p.fr-tile__title::text").get().strip()
-                elif section.css(".item-liste-rubriques-seule"):
-                    section_title = section.css(".fr-tile__link::text").get().strip()
 
-                if section_title == str(self.target_year):
+                    links = section.css(".fr-collapse a")
 
-                    if section.css(".rubrique_avec_sous-rubriques"):
-
-                        links = section.css(".fr-collapse a")
-
-                        for l in links:
-                            link_url = l.attrib["href"]
-                            link_text = l.css("::text").get().strip()
-
-                            yield response.follow(
-                                link_url,
-                                callback=self.parse_projects_list,
-                                cb_kwargs=dict(
-                                    department=department, subdiv=link_text, page=1
-                                ),
-                            )
-
-                    elif section.css(".item-liste-rubriques-seule"):
-
-                        link_url = section.css("a").attrib["href"]
+                    for l in links:
+                        link_url = l.attrib["href"]
+                        link_text = l.css("::text").get().strip()
 
                         yield response.follow(
                             link_url,
                             callback=self.parse_projects_list,
-                            cb_kwargs=dict(department=department, page=1),
+                            cb_kwargs=dict(
+                                department=department, subdiv=link_text, page=1
+                            ),
                         )
 
-        else:
-            raise CloseSpider("Target year is 2016 or before. Not supported for now.")
+                elif section.css(".item-liste-rubriques-seule"):
+
+                    link_url = section.css("a").attrib["href"]
+
+                    yield response.follow(
+                        link_url,
+                        callback=self.parse_projects_list,
+                        cb_kwargs=dict(department=department, page=1),
+                    )
 
     def parse_projects_list(self, response, department, page, subdiv=""):
         """Parse projects list for a year & department."""
@@ -119,8 +115,14 @@ class ARASpider(scrapy.Spider):
         self.check_time_limit()
         self.check_upload_limit()
 
+        year_from_page = (
+            response.css("#breadcrumb ol.fr-breadcrumb__list > li > a")[7]
+            .css("::text")
+            .get()
+        )
+
         self.logger.info(
-            f"Scraping {department}{' ' + subdiv if subdiv else ''}, page {page}"
+            f"Scraping {year_from_page} {department}{' ' + subdiv if subdiv else ''}, page {page}"
         )
 
         projects_links = response.css("#contenu .liste-articles .fr-card__link")
@@ -132,7 +134,9 @@ class ARASpider(scrapy.Spider):
             yield response.follow(
                 link_url,
                 callback=self.parse_project_page,
-                cb_kwargs=dict(department=department, subdiv=subdiv),
+                cb_kwargs=dict(
+                    department=department, subdiv=subdiv, year=year_from_page
+                ),
             )
 
         # next page
@@ -151,7 +155,7 @@ class ARASpider(scrapy.Spider):
                 cb_kwargs=dict(department=department, page=page + 1, subdiv=subdiv),
             )
 
-    def parse_project_page(self, response, department, subdiv):
+    def parse_project_page(self, response, department, subdiv, year):
         """Parse the page of a project."""
 
         self.check_time_limit()
@@ -178,10 +182,10 @@ class ARASpider(scrapy.Spider):
                     title=link_text,
                     source_page_url=response.request.url,
                     project=project,
-                    year=str(self.target_year),
+                    year=year,
                     authority="Préfecture de région Auvergne-Rhône-Alpes",
                     category_local="Les décisions au cas par cas - Projets",
-                    source_scraper=f"DREAL ARA Scraper {self.target_year}",
+                    source_scraper=f"DREAL ARA Scraper {self.target_years[0]}-{self.target_years[-1]}",
                     department_from_scraper=re.search(r"\((\d\d)\)", department).group(
                         1
                     ),
@@ -289,7 +293,7 @@ class ARASpider(scrapy.Spider):
                         project=doc_item["project"],
                         category_local=doc_item["category_local"],
                         authority=doc_item["authority"],
-                        source_scraper=f"DREAL ARA Scraper {self.target_year}",
+                        source_scraper=f"DREAL ARA Scraper {self.target_years[0]}-{self.target_years[0]}",
                         source_file_url=response.request.url,
                         source_filename=f.name,
                         source_page_url=doc_item["source_page_url"],
@@ -297,6 +301,6 @@ class ARASpider(scrapy.Spider):
                         local_file_path=str(f),
                         zip_seen_supported_files=zip_seen_supported_files,
                         file_from_zip=True,
-                        year=str(self.target_year),
+                        year=doc_item["year"],
                         department_from_scraper=doc_item["department_from_scraper"],
                     )
