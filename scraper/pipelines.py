@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import logging
 import json
 import hashlib
+import sys
 
 from itemadapter import ItemAdapter
 from scrapy.exceptions import DropItem
@@ -18,10 +19,24 @@ from .log import SilentDropItem
 from .departments import department_from_authority, departments_from_project_name
 
 
+class SpiderPipeline:
+    """Base class for pipelines that need access to the spider instance.
+
+    Provides from_crawler() to store spider as self.spider.
+    Inherit from this class instead of defining from_crawler() in each pipeline.
+    """
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        pipeline = cls()
+        pipeline.spider = crawler.spider
+        return pipeline
+
+
 class ParseDatePipeline:
     """Parse dates from scraped data."""
 
-    def process_item(self, item, spider):
+    def process_item(self, item):
         """Parse date from the extracted string."""
 
         # Publication date
@@ -45,7 +60,7 @@ class ParseDatePipeline:
 class CategoryPipeline:
     """Attribute the final category of the document."""
 
-    def process_item(self, item, spider):
+    def process_item(self, item):
         if "cas par cas" in item["category_local"].lower():
             item["category"] = "Cas par cas"
 
@@ -55,7 +70,7 @@ class CategoryPipeline:
 class SourceFilenamePipeline:
     """Adds the source_filename field based on source_file_url."""
 
-    def process_item(self, item, spider):
+    def process_item(self, item):
 
         adapter = ItemAdapter(item)
 
@@ -69,7 +84,7 @@ class SourceFilenamePipeline:
 
 
 class BeautifyPipeline:
-    def process_item(self, item, spider):
+    def process_item(self, item):
         """Beautify & harmonize project & title names."""
 
         # Project
@@ -109,7 +124,7 @@ class BeautifyPipeline:
 
 class UnsupportedFiletypePipeline:
 
-    def process_item(self, item, spider):
+    def process_item(self, item):
 
         filename, file_extension = os.path.splitext(item["source_filename"])
         file_extension = file_extension.lower()
@@ -127,32 +142,38 @@ class UnsupportedFiletypePipeline:
             return item
 
 
-class UploadLimitPipeline:
+class UploadLimitPipeline(SpiderPipeline):
     """Sends the signal to close the spider once the upload limit is attained."""
 
-    def open_spider(self, spider):
+    def open_spider(self):
         self.number_of_docs = 0
 
-    def process_item(self, item, spider):
+    def process_item(self, item):
         self.number_of_docs += 1
 
-        if spider.upload_limit == 0 or self.number_of_docs <= spider.upload_limit:
+        if (
+            self.spider.upload_limit == 0
+            or self.number_of_docs <= self.spider.upload_limit
+        ):
             return item
         else:
-            spider.upload_limit_attained = True
+            self.spider.upload_limit_attained = True
             raise SilentDropItem("Upload limit exceeded.")
 
 
 class TagDepartmentsPipeline:
 
-    def process_item(self, item, spider):
+    def process_item(self, item):
 
         item["departments"] = [item["department_from_scraper"]]
         item["departments_sources"] = ["scraper"]
 
         authority_department = department_from_authority(item["authority"])
 
-        if authority_department and authority_department != department_from_scraper:
+        if (
+            authority_department
+            and authority_department != item["department_from_scraper"]
+        ):
             item["departments_sources"].append("authority")
             item["departments"].append(authority_department)
 
@@ -172,7 +193,7 @@ class TagDepartmentsPipeline:
 
 class ProjectIDPipeline:
 
-    def process_item(self, item, spider):
+    def process_item(self, item):
 
         project_name = item["project"]
         source_page_url = item["source_page_url"]
@@ -186,18 +207,18 @@ class ProjectIDPipeline:
         return item
 
 
-class UploadPipeline:
+class UploadPipeline(SpiderPipeline):
     """Upload document to DocumentCloud & store event data."""
 
-    def open_spider(self, spider):
+    def open_spider(self):
 
         documentcloud_logger = logging.getLogger("documentcloud")
         documentcloud_logger.setLevel(logging.WARNING)
 
-        if not spider.dry_run:
+        if not self.spider.dry_run:
             try:
-                spider.logger.info("Loading event data from DocumentCloud...")
-                spider.event_data = spider.load_event_data()
+                self.spider.logger.info("Loading event data from DocumentCloud...")
+                self.spider.event_data = self.spider.load_event_data()
 
             except Exception as e:
                 raise Exception("Error loading event data").with_traceback(
@@ -208,27 +229,29 @@ class UploadPipeline:
             # Load from json if present
             try:
                 with open("event_data.json", "r") as file:
-                    spider.logger.info("Loading event data from local JSON file...")
+                    self.spider.logger.info(
+                        "Loading event data from local JSON file..."
+                    )
 
                     data = json.load(file)
 
-                    spider.event_data = {
+                    self.spider.event_data = {
                         "documents": data["documents"],
                         "zips": data["zips"],
                     }
             except:
-                spider.event_data = None
+                self.spider.event_data = None
 
-        if spider.event_data:
-            spider.logger.info(
-                f"Loaded event data ({len(spider.event_data['documents'])} documents, {len(spider.event_data['zips'])} zip files)"
+        if self.spider.event_data:
+            self.spider.logger.info(
+                f"Loaded event data ({len(self.spider.event_data['documents'])} documents, {len(self.spider.event_data['zips'])} zip files)"
             )
 
         else:
-            spider.logger.info("No event data was loaded.")
-            spider.event_data = {"documents": {}, "zips": {}}
+            self.spider.logger.info("No event data was loaded.")
+            self.spider.event_data = {"documents": {}, "zips": {}}
 
-    def process_item(self, item, spider):
+    def process_item(self, item):
 
         filename, file_extension = os.path.splitext(item["source_filename"])
         file_extension = file_extension.lower()
@@ -272,17 +295,17 @@ class UploadPipeline:
             data["departments_sources"] = item["departments_sources"]
 
         try:
-            if not spider.dry_run:
-                spider.client.documents.upload(
+            if not self.spider.dry_run:
+                self.spider.client.documents.upload(
                     file_path,
                     original_extension=file_extension.lstrip("."),
-                    project=spider.target_project,
+                    project=self.spider.target_project,
                     title=item["title"],
                     description=item["project"],
                     publish_at=item["publication_datetime_dcformat"],
                     source="www.auvergne-rhone-alpes.developpement-durable.gouv.fr",
                     language="fra",
-                    access=spider.access_level,
+                    access=self.spider.access_level,
                     data=data,
                 )
 
@@ -295,7 +318,7 @@ class UploadPipeline:
             ).isoformat()
             now = datetime.datetime.now().isoformat(timespec="seconds")
 
-            spider.event_data["documents"][item["event_data_key"]] = {
+            self.spider.event_data["documents"][item["event_data_key"]] = {
                 "last_modified": last_modified,
                 "last_seen": now,
                 "target_year": item["year"],
@@ -309,70 +332,70 @@ class UploadPipeline:
                     file_event_data_path = (
                         item["source_file_url"] + "/" + seen_file_path
                     )
-                    if file_event_data_path not in spider.event_data["documents"]:
+                    if file_event_data_path not in self.spider.event_data["documents"]:
                         zip_fully_processed = False
                 if zip_fully_processed:
-                    spider.event_data["zips"][item["source_file_url"]] = {
+                    self.spider.event_data["zips"][item["source_file_url"]] = {
                         "last_modified": last_modified,
                         "last_seen": now,
                         "target_year": item["year"],
                     }
 
             # Store event_data (# only from the web interface)
-            if spider.run_id and not spider.dry_run:
-                spider.store_event_data(spider.event_data)
+            if self.spider.run_id and not self.spider.dry_run:
+                self.spider.store_event_data(self.spider.event_data)
 
         return item
 
-    def close_spider(self, spider):
+    def close_spider(self):
         """Update event data when the spider closes."""
 
-        if not spider.dry_run and spider.run_id:
-            if spider.event_data:
-                spider.store_event_data(spider.event_data)
-                spider.logger.info(
-                    f"Uploaded event data ({len(spider.event_data['documents'])} documents, {len(spider.event_data['zips'])} zip files)"
+        if not self.spider.dry_run and self.spider.run_id:
+            if self.spider.event_data:
+                self.spider.store_event_data(self.spider.event_data)
+                self.spider.logger.info(
+                    f"Uploaded event data ({len(self.spider.event_data['documents'])} documents, {len(self.spider.event_data['zips'])} zip files)"
                 )
                 # Upload the event_data to the DocumentCloud interface
                 now = datetime.datetime.now()
                 timestamp = now.strftime("%Y%m%d_%H%M")
                 filename = f"event_data_DREAL_ARA_{timestamp}.json"
 
-                if spider.upload_event_data:
+                if self.spider.upload_event_data:
                     with open(filename, "w+") as event_data_file:
-                        json.dump(spider.event_data, event_data_file)
-                        spider.upload_file(event_data_file)
-                    spider.logger.info(
+                        json.dump(self.spider.event_data, event_data_file)
+                        self.spider.upload_file(event_data_file)
+                    self.spider.logger.info(
                         f"Uploaded event data to the Documentcloud interface."
                     )
 
             else:
-                spider.logger.info("No event data to upload.")
+                self.spider.logger.info("No event data to upload.")
 
-        if not spider.run_id:
-            if spider.event_data:
+        if not self.spider.run_id:
+            if self.spider.event_data:
                 with open("event_data.json", "w") as event_data_file:
-                    json.dump(spider.event_data, event_data_file)
-                    spider.logger.info(
-                        f"Saved file event_data.json ({len(spider.event_data['documents'])} documents, {len(spider.event_data['zips'])} zip files)"
+                    json.dump(self.spider.event_data, event_data_file)
+                    self.spider.logger.info(
+                        f"Saved file event_data.json ({len(self.spider.event_data['documents'])} documents, {len(self.spider.event_data['zips'])} zip files)"
                     )
             else:
-                spider.logger.info("No event data to write.")
+                self.spider.logger.info("No event data to write.")
 
 
-class MailPipeline:
+class MailPipeline(SpiderPipeline):
     """Send scraping run report when the spider closes."""
 
-    def open_spider(self, spider):
+    def open_spider(self):
         self.scraped_items = []
 
-    def process_item(self, item, spider):
+    def process_item(self, item):
 
         self.scraped_items.append(item)
 
         return item
 
-    def close_spider(self, spider):
+    def close_spider(self):
 
         def print_item(item):
             item_string = f"""
@@ -391,30 +414,35 @@ class MailPipeline:
 
             return item_string
 
-        subject = f"DREAL ARA Scraper {str(spider.target_years[0])}-{str(spider.target_years[-1])} (New: {len(self.scraped_items)}) [{spider.run_name}]"
+        if len(self.spider.target_years) == 1:
+            year_range_str = str(self.spider.target_years[0])
+        else:
+            year_range_str = f"{str(self.spider.target_years[0])}-{str(self.spider.target_years[-1])}"
+
+        subject = f"DREAL ARA Scraper {year_range_str} (New: {len(self.scraped_items)}) [{self.spider.run_name}]"
 
         content = f"SCRAPED ITEMS ({len(self.scraped_items)})\n\n" + "\n\n".join(
             [print_item(item) for item in self.scraped_items]
         )
 
-        start_content = f"DREAL ARA Scraper Addon Run {spider.run_id}"
+        start_content = f"DREAL ARA Scraper Addon Run {self.spider.run_id}"
 
         content = "\n\n".join([start_content, content])
 
-        if not spider.dry_run:
-            spider.send_mail(subject, content)
+        if not self.spider.dry_run:
+            self.spider.send_mail(subject, content)
 
 
 class DeleteZipFilesPipeline:
     """Delete files from downloaded zips to save some disk space"""
 
-    def process_item(self, item, spider):
+    def process_item(self, item):
         if item["file_from_zip"]:
             if os.path.isfile(item["local_file_path"]):
                 os.remove(item["local_file_path"])
         return item
 
-    def close_spider(self, spider):
+    def close_spider(self):
         # Delete the downloaded_zips folder
         if os.path.isdir("downloaded_zips"):
             shutil.rmtree("downloaded_zips")
