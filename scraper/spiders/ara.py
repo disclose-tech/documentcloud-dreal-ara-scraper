@@ -42,6 +42,12 @@ class ARASpider(scrapy.Spider):
                     f"Closed due to time limit ({self.time_limit} minutes)"
                 )
 
+    def is_known(self, key, section="documents"):
+        """Whether the entry is in the archived or live event data ("documents" or "zips")."""
+        return (
+            key in self.archived_event_data[section] or key in self.event_data[section]
+        )
+
     def check_upload_limit(self):
         """Closes the spider if the upload limit is attained."""
         if self.upload_limit_attained:
@@ -174,8 +180,8 @@ class ARASpider(scrapy.Spider):
             absolute_url = response.urljoin(link_url)
 
             if (
-                absolute_url not in self.event_data["documents"]
-                and absolute_url not in self.event_data["zips"]
+                not self.is_known(absolute_url)
+                and not self.is_known(absolute_url, "zips")
             ):
 
                 doc_item = DocumentItem(
@@ -214,7 +220,7 @@ class ARASpider(scrapy.Spider):
         # Detect zip files and process them separately
         if doc_item["source_file_url"].lower().endswith(".zip"):
 
-            if doc_item["source_file_url"] not in self.event_data["zips"]:
+            if not self.is_known(doc_item["source_file_url"], "zips"):
                 yield Request(
                     url=response.request.url,
                     callback=self.parse_zip_file,
@@ -222,7 +228,7 @@ class ARASpider(scrapy.Spider):
                 )
 
         else:
-            if doc_item["source_file_url"] not in self.event_data["documents"]:
+            if not self.is_known(doc_item["source_file_url"]):
                 doc_item["file_from_zip"] = False
                 yield doc_item
 
@@ -288,7 +294,7 @@ class ARASpider(scrapy.Spider):
                     doc_item["source_file_url"] + "/" + item_relative_filepath
                 )
 
-                if not event_data_path in self.event_data["documents"]:
+                if not self.is_known(event_data_path):
                     yield DocumentItem(
                         project=doc_item["project"],
                         category_local=doc_item["category_local"],
